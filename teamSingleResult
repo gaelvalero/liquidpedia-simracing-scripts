@@ -1,0 +1,493 @@
+<script>
+//ver1 - Results & Participants
+//ver2 - Detailed Results
+function str_pad_left(string, pad, length) {
+  return (new Array(length + 1).join(pad) + string).slice(-length);
+}
+
+function iRacingTimeToString(timestamp)
+{
+	if(timestamp != -1)
+	{
+		timeFlatSeconds = Math.floor(timestamp / 10000);
+		timeMilliseconds = (timestamp / 10000 % 1).toFixed(4);
+		timeMinutes = Math.floor(timeFlatSeconds / 60);
+		timeSeconds = timeFlatSeconds - timeMinutes * 60;			
+				
+		if(timeMinutes != 0)
+		{
+			return str_pad_left(timeMinutes, '0', 2) + ':' + str_pad_left(timeSeconds, '0', 2) + '.' + str_pad_left(timeMilliseconds, '', 4);	
+		}
+		else
+		{
+			return str_pad_left(timeSeconds, '0', 2) + '.' + str_pad_left(timeMilliseconds, '', 4);	
+		}
+	}	
+	else
+	{
+		return "";
+	}
+}
+
+function getFile (elm) {
+try {
+	document.getElementById('results').innerHTML = "";
+	document.getElementById('entries').innerHTML = "";
+	document.getElementById('ladder').innerHTML = "";
+	
+  new Response(elm.files[0]).json().then(json => {
+    // race results
+	//console.log(json['data']['session_results']);
+	results = {};
+	resultsQualy = {};
+	for (const [key, value] of Object.entries(json['data']['session_results'])) {	
+		if(value['simsession_type_name'] == "Race")
+		{
+			results = json['data']['session_results'][key]['results'];
+		}
+		else if(value['simsession_type_name'].includes("Qualifying"))
+		{
+			resultsQualy = json['data']['session_results'][key]['results'];
+		}
+	}
+	
+	if(Object.keys(results).length == 0)
+	{
+		console.log('no race result');
+	}
+	
+	classArray = {};
+	classRaceFastestLaps = {};
+	// team['display_name'],team['car_class_name'],team['car_name'],team['driver_results'])
+	results.forEach(function(team) {
+		if(!classArray[team['car_class_name']])
+		{
+			classArray[team['car_class_name']] = [team];
+		}
+		else
+		{
+			classArray[team['car_class_name']].push(team);
+		}
+		
+		if(classRaceFastestLaps[team['car_class_name']])
+		{
+			if(team['best_lap_time'] != -1 && team['best_lap_time'] < classRaceFastestLaps[team['car_class_name']])
+			{
+				classRaceFastestLaps[team['car_class_name']] = team['best_lap_time'];
+			}
+		}
+		else
+		{
+			classRaceFastestLaps[team['car_class_name']] = team['best_lap_time'];
+		}
+	});
+
+	for (var carClass in classArray) {
+		// results
+		resultDiv = document.getElementById("results");
+		classDiv = document.createElement("div");
+		classDiv.innerHTML += "===="+carClass+"====<br>";
+		classDiv.innerHTML += "{{TeamPrizePool |cutafter=3 |prizesummary=no<br>";
+				
+		for (const [key, value] of Object.entries(classArray[carClass])) {
+		parsedName = value["display_name"].replace('#','').replace('$','');
+		  classDiv.innerHTML += "|{{Slot |{{Opponent |"+parsedName+" }}}}<br>";
+		}
+		classDiv.innerHTML += "{{box|break|padding=2em}}<br>";
+		classDiv.innerHTML += "}}<br>";
+		resultDiv.appendChild(classDiv);
+		
+	}
+	
+	// entries
+	entriesDiv = document.getElementById("entries");
+	entryDiv = document.createElement("div");
+	entryDiv.innerHTML += "==Participants==<br>";
+	entryDiv.innerHTML += "{{TeamCardToggleButton|left}}<br>";
+	entryDiv.innerHTML += "{{Tabs dynamic<br>";
+	entryDiv.innerHTML += "|This=1<br>";
+	
+	//class names
+	i = 1
+	for (var carClass in classArray)
+	{	
+		entryDiv.innerHTML += "|name"+i+"="+carClass+"<br>";
+		i++;
+	}
+	
+	i = 1
+	for (var carClass in classArray) {
+		//content	
+		entryDiv.innerHTML += "|content"+i+"=<br>";
+		entryDiv.innerHTML += "{{box|start|padding=2em}}<br>";
+		for (const [key, value] of Object.entries(classArray[carClass])){		
+			entryDiv.innerHTML += "{{TeamCard<br>";
+			entryDiv.innerHTML += "|team="+value["display_name"].replace('#','').replace('$','')+"<br>"
+			if(value["car_name"].split(" ")[0] == "[Legacy]"){
+				entryDiv.innerHTML += "|qualifier={{Manufacturer/"+value["car_name"].split(" ")[1].toLowerCase()+"}} [["+value["car_name"].substr(value["car_name"].indexOf(" ") + 1)+"|"+value["car_name"].split(" ").slice(2).join(' ')+"]]<br>"
+			}
+			else
+			{
+				entryDiv.innerHTML += "|qualifier={{Manufacturer/"+value["car_name"].split(" ")[0].toLowerCase()+"}} [["+value["car_name"]+"|"+value["car_name"].substr(value["car_name"].indexOf(" ") + 1)+"]]<br>"
+			}
+			
+			for (const [keyDriver, valueDriver] of Object.entries(classArray[carClass][key]['driver_results'])) {
+				numDriver = parseInt(keyDriver)+1
+				entryDiv.innerHTML += "|p"+ numDriver +"="+valueDriver["display_name"]+" |p"+ numDriver +"flag="+valueDriver["country_code"]+"<br>"
+			}
+			entryDiv.innerHTML += "|players="+numDriver+"<br>";
+			entryDiv.innerHTML += "}}<br>";
+			if(parseInt(key) != Object.keys(classArray[carClass]).length-1)
+			{
+				entryDiv.innerHTML += "{{box|break|padding=2em}}<br>";		
+			}
+		}
+		entryDiv.innerHTML += "{{box|end}}<br>";
+		
+		if(i == Object.keys(classArray).length){
+			entryDiv.innerHTML += "}}<br>";
+		}
+
+		entriesDiv.appendChild(entryDiv);
+		i++;
+	}
+	
+	// ladder
+	ladderDiv = document.getElementById("ladder");
+	ladderEntryDiv = document.createElement("div");
+	ladderEntryDiv.innerHTML += "==Detailed Results==<br>";
+	ladderEntryDiv.innerHTML += "{{box|start|padding=2em}}<br>";
+	
+	i = 1;
+	if(Object.keys(resultsQualy).length > 0)
+	{
+		classFastestLaps = {}
+		resultsQualy.forEach(function(team) {
+			if(classFastestLaps[team['car_class_name']])
+			{
+				if(team['best_qual_lap_time'] != -1 && team['best_qual_lap_time'] < classFastestLaps[team['car_class_name']])
+				{
+					classFastestLaps[team['car_class_name']] = team['best_qual_lap_time'];
+				}
+			}
+			else
+			{
+				classFastestLaps[team['car_class_name']] = team['best_qual_lap_time'];
+			}
+		});
+		
+		// qualy
+		ladderEntryDiv.innerHTML += "===Qualifying===<br>";
+		divText = document.createTextNode("<div class=\"table-responsive\">");
+		ladderEntryDiv.appendChild(divText);
+		ladderEntryDiv.innerHTML += "<br>{|class=\"wikitable wikitable-striped\" style=\"text-align: center;\"<br>";
+		ladderEntryDiv.innerHTML += "!style=\"min-width: 40px;\"|Pos.<br>";
+		if(Object.keys(classArray).length > 1)
+		{
+			ladderEntryDiv.innerHTML += "!style=\"min-width: 40px;\"|Pos. class<br>";
+			ladderEntryDiv.innerHTML += "!style=\"min-width: 40px;\"|Class<br>";
+		}
+		ladderEntryDiv.innerHTML += "!style=\"min-width: 40px;\"|No.<br>";
+		ladderEntryDiv.innerHTML += "!Team<br>";
+		ladderEntryDiv.innerHTML += "!Driver<br>";
+		ladderEntryDiv.innerHTML += "!Car<br>";
+		ladderEntryDiv.innerHTML += "!style=\"padding-left: 15px;\"|Time<br>";
+		if(Object.keys(classArray).length > 1)
+		{
+			ladderEntryDiv.innerHTML += "!style=\"min-width: 15px;\"|Gap class<br>";
+		}
+		ladderEntryDiv.innerHTML += "!style=\"padding-left: 15px;\"|Gap<br>";
+		ladderEntryDiv.innerHTML += "|-<br>";
+		resultsQualy.forEach(function(team) {
+			// multiclass
+			if(Object.keys(classArray).length > 1)
+			{
+				carBrand = "";
+				if(team["car_name"].split(" ")[0] == "[Legacy]")
+				{
+					carBrand = "{{Manufacturer/"+team["car_name"].split(" ")[1].toLowerCase()+"}}";
+				}
+				else
+				{
+					carBrand = "{{Manufacturer/"+team["car_name"].split(" ")[0].toLowerCase()+"}}";
+				}
+				
+				ladderEntryDiv.innerHTML += "|'''"+i+"'''|";
+				
+				if(team["finish_position_in_class"]+1 == 1)
+				{
+					ladderEntryDiv.innerHTML += "|'''"+(team["finish_position_in_class"]+1)+"'''||'''"+team['car_class_name']+"'''||'''"+team["livery"]["car_number"]+"''' ||style=\"text-align: left;\"|'''{{team|"+team["display_name"].replace('#','').replace('$','')+"}}''' ||style=\"text-align: left;\"|{{player|"+team["driver_results"][0]["display_name"]+"|flag="+team["driver_results"][0]["country_code"]+"}}||"+ carBrand +"<br>";
+				}
+				else
+				{
+					console.log(team["driver_results"][0])
+					ladderEntryDiv.innerHTML += "|"+(team["finish_position_in_class"]+1)+"||"+team['car_class_name']+"||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}}||style=\"text-align: left;\"|{{player|"+team["driver_results"][0]["display_name"]+"|flag="+team["driver_results"][0]["country_code"]+"}}||"+ carBrand +"<br>";
+				}
+				
+				if(team['best_qual_lap_time'] === -1)
+				{			
+						ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|No Time|| ||<br>";
+				}
+				else
+				{
+					if(team["finish_position_in_class"]+1 == 1 && i != 1)
+					{
+						ladderEntryDiv.innerHTML += "|class=\"bg-byeup\" style=\"text-align: right; padding-left: 15px;\"|'''"+iRacingTimeToString(team['best_qual_lap_time'])+"'''|| ||style=\"text-align: right; padding-left: 15px;\"|+"+iRacingTimeToString(team['interval'])+"<br>";
+					}
+					else if(team["finish_position_in_class"]+1 == 1)
+					{
+						ladderEntryDiv.innerHTML += "|class=\"bg-byeup\" style=\"text-align: right; padding-left: 15px;\"|'''"+iRacingTimeToString(team['best_qual_lap_time'])+"'''|| ||<br>";
+					}
+					else
+					{
+						ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+iRacingTimeToString(team['best_qual_lap_time'])+"||style=\"text-align: right; padding-left: 15px;\"|+"+(iRacingTimeToString(team['best_qual_lap_time']-classFastestLaps[team['car_class_name']]))+"||style=\"text-align: right; padding-left: 15px;\"|+"+iRacingTimeToString(team['interval'])+"<br>";
+					}
+				}		
+				
+				ladderEntryDiv.innerHTML += "|-<br>";
+				i++;
+			}
+			else
+			{	
+				//single class
+				carBrand = "";
+				if(team["car_name"].split(" ")[0] == "[Legacy]")
+				{
+					carBrand = "{{Manufacturer/"+team["car_name"].split(" ")[1].toLowerCase()+"}}";
+				}
+				else
+				{
+					carBrand = "{{Manufacturer/"+team["car_name"].split(" ")[0].toLowerCase()+"}}";
+				}
+				ladderEntryDiv.innerHTML += "|'''"+i+"''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				
+				if(team['best_qual_lap_time'] === -1)
+				{			
+						ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|No Time||style=\"text-align: right; padding-left: 15px;\"|<br>";
+				}
+				else
+				{
+					if(i === 1)
+					{
+						ladderEntryDiv.innerHTML += "|class=\"bg-byeup\" style=\"text-align: right; padding-left: 15px;\"|"+iRacingTimeToString(team['best_qual_lap_time'])+"||<br>";
+					}
+					else
+					{
+						ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+iRacingTimeToString(team['best_qual_lap_time'])+"||style=\"text-align: right; padding-left: 15px;\"|+"+iRacingTimeToString(team['interval'])+"<br>";
+					}
+				}		
+				
+				ladderEntryDiv.innerHTML += "|-<br>";
+				i++;
+			}
+		});
+		
+		ladderEntryDiv.innerHTML += "|}<br>";
+		divText = document.createTextNode("</div>");
+		ladderEntryDiv.appendChild(divText);
+		ladderEntryDiv.innerHTML += "<br>{{box|break|padding=2em}}<br>";
+	}
+	
+	//race
+	ladderEntryDiv.innerHTML += "===Race===<br>";
+	divText = document.createTextNode("<div class=\"table-responsive\">");
+	ladderEntryDiv.appendChild(divText);
+	ladderEntryDiv.innerHTML += "<br>{|class=\"wikitable wikitable-striped\" style=\"text-align: center;\"<br>";
+	ladderEntryDiv.innerHTML += "{|class=\"wikitable wikitable-striped\" style=\"text-align: center;\"<br>";
+	ladderEntryDiv.innerHTML += "!style=\"min-width: 40px;\"|Pos.<br>";
+	if(Object.keys(classArray).length > 1)
+	{
+		ladderEntryDiv.innerHTML += "!style=\"min-width: 15px;\"|Pos. class<br>";
+		ladderEntryDiv.innerHTML += "!style=\"min-width: 40px;\"|Class<br>";
+	}
+	ladderEntryDiv.innerHTML += "!style=\"min-width: 40px;\"|No.<br>";
+	ladderEntryDiv.innerHTML += "!Team<br>";
+	ladderEntryDiv.innerHTML += "!Car<br>";
+	ladderEntryDiv.innerHTML += "!style=\"padding-left: 15px;\"|Gap<br>";
+	ladderEntryDiv.innerHTML += "!Grid<br>";
+	ladderEntryDiv.innerHTML += "!style=\"padding-left: 15px;\"|FL<br>";
+	ladderEntryDiv.innerHTML += "|-<br>";
+	
+	i = 1
+	lapTime=9999999;
+	teamIdFastestLap = 0;
+	results.forEach(function(team) {
+		if(team['best_lap_time'] < lapTime && team['best_lap_time'] != -1)
+		{
+			lapTime = team['best_lap_time'];
+			teamKeyFastestLap = i;
+		}
+		i++;
+	});
+	
+	i = 1
+	//overall results
+	results.forEach(function(team) {
+		carBrand = "";
+		if(team["car_name"].split(" ")[0] == "[Legacy]")
+		{
+			carBrand = "{{Manufacturer/"+team["car_name"].split(" ")[1].toLowerCase()+"}}";
+		}
+		else
+		{
+			carBrand = "{{Manufacturer/"+team["car_name"].split(" ")[0].toLowerCase()+"}}";
+		}
+		
+		teamInterval = ""
+		if(team['interval'] == -1)
+		{
+			teamInterval = "-" + (results[0]['laps_complete'] - team['laps_complete']) + " Laps";
+		}
+		else
+		{
+			teamInterval = "+" + iRacingTimeToString(team['interval']);
+		}
+		
+		//multiclass
+		if(Object.keys(classArray).length > 1)
+		{
+			
+			if(i == 1)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1'''|";
+			}
+			else if(i == 2)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-second|'''2'''|";
+			}
+			else if(i == 3)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-third|'''3'''|";
+			}
+			else
+			{
+				ladderEntryDiv.innerHTML += "|'''"+i+"'''|";
+			}
+			
+			
+			if(team["finish_position_in_class"]+1 == 1 && i == 1)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1'''||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+team['laps_complete']+" Laps||"+ (team['starting_position']+1)
+			}
+			else if(team["finish_position_in_class"]+1 == 1 && i != 1)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1''' ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1)
+			}
+			else if(team["finish_position_in_class"]+1 == 2)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-second|'''2''' ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1);
+			}
+			else if(team["finish_position_in_class"]+1 == 3)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-third|'''3''' ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1);
+			}
+			else
+			{
+				ladderEntryDiv.innerHTML += "|"+ (team["finish_position_in_class"]+1) +"||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1);
+			}
+			
+			if(team['best_lap_time'] === classRaceFastestLaps[team['car_class_name']])
+			{
+				ladderEntryDiv.innerHTML += "||class=\"bg-byeup\"|"+iRacingTimeToString(team['best_lap_time'])+"<br>";
+			}
+			else
+			{
+				ladderEntryDiv.innerHTML += "||"+iRacingTimeToString(team['best_lap_time'])+"<br>";
+			}
+			
+		}
+		//singleclass
+		else
+		{
+			if(i == 1)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+team['laps_complete']+" Laps||"+ (team['starting_position']+1)
+			}
+			else if(i == 2)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-second|'''2''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+" ||"+ (team['starting_position']+1);
+			}
+			else if(i == 3)
+			{
+				ladderEntryDiv.innerHTML += "|class=\"bg-third|'''3''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+" ||"+ (team['starting_position']+1);
+			}
+			else
+			{
+				ladderEntryDiv.innerHTML += "|'''"+i+"''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+" ||"+ (team['starting_position']+1);
+			}
+			
+			if(i == teamKeyFastestLap)
+			{
+				ladderEntryDiv.innerHTML += "||class=\"bg-byeup\"|"+iRacingTimeToString(team['best_lap_time'])+"<br>";
+			}
+			else
+			{
+				ladderEntryDiv.innerHTML += "||"+iRacingTimeToString(team['best_lap_time'])+"<br>";
+			}
+		}
+		
+		
+		ladderEntryDiv.innerHTML += "|-<br>";
+		i++;
+	});
+	
+	ladderEntryDiv.innerHTML += "|}<br>";
+	divText = document.createTextNode("</div>");
+	ladderEntryDiv.appendChild(divText);
+	ladderEntryDiv.innerHTML += "<br>{{box|end}}<br>";
+	
+	ladderDiv.appendChild(ladderEntryDiv);
+	
+  });
+    
+	} catch (error) {
+	  console.error(error);
+	  // Expected output: ReferenceError: nonExistentFunction is not defined
+	  // (Note: the exact output may be browser-dependent)
+	}
+	
+}
+
+	function copyContent(id) {
+	  //content = document.getElementById('content');
+	  var r = document.createRange();
+		r.selectNode(document.getElementById(id));
+		window.getSelection().removeAllRanges();
+		window.getSelection().addRange(r);
+		try {
+			document.execCommand('copy');
+			window.getSelection().removeAllRanges();
+			alert('Successfully copied');
+		} catch (err) {
+			console.log('Unable to copy!');
+		}
+
+	}
+</script>
+
+<label for="resultFile">Choose a JSON result file:</label>
+
+<input type="file" id="resultFile" onchange="getFile(this)"/>
+
+<!-- The button used to copy the text -->
+<button onclick="copyContent('content')">Copy content</button>
+
+<div id="content">
+	<div id="results">
+	</div>
+	<br>
+	<div id="entries">
+	</div>
+	<div id="ladder">
+	</div>
+</div>
+
