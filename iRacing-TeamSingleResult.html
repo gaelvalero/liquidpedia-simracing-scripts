@@ -269,7 +269,16 @@ try {
 				{
 					carBrand = "{{Manufacturer/"+team["car_name"].split(" ")[0].toLowerCase()+"}}";
 				}
-				ladderEntryDiv.innerHTML += "|'''"+i+"''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}}||style=\"text-align: left;\"|{{player|"+team["driver_results"][0]["display_name"]+"|flag="+team["driver_results"][0]["country_code"]+"}}||"+ carBrand +"<br>";
+				console.log(team["driver_results"][0])
+				if(team["driver_results"][0])
+				{
+					ladderEntryDiv.innerHTML += "|'''"+i+"''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}}||style=\"text-align: left;\"|{{player|"+team["driver_results"][0]["display_name"]+"|flag="+team["driver_results"][0]["country_code"]+"}}||"+ carBrand +"<br>";
+				}
+				else
+				{
+					ladderEntryDiv.innerHTML += "|'''"+i+"''' ||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}}||style=\"text-align: left;\"|N/A||"+ carBrand +"<br>";
+				}
+			
 				
 				if(team['best_qual_lap_time'] === -1)
 				{			
@@ -500,4 +509,3 @@ try {
 	<div id="ladder">
 	</div>
 </div>
-
