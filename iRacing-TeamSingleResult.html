@@ -41,6 +41,7 @@ try {
 	//console.log(json['data']['session_results']);
 	results = {};
 	resultsQualy = {};
+	multiclass = false;
 	for (const [key, value] of Object.entries(json['data']['session_results'])) {	
 		if(value['simsession_type_name'] == "Race")
 		{
@@ -82,12 +83,20 @@ try {
 			classRaceFastestLaps[team['car_class_name']] = team['best_lap_time'];
 		}
 	});
+	
+	if(Object.keys(classArray).length > 1)
+	{
+		multiclass = true;
+	}
 
 	for (var carClass in classArray) {
 		// results
 		resultDiv = document.getElementById("results");
 		classDiv = document.createElement("div");
-		classDiv.innerHTML += "===="+carClass+"====<br>";
+		if(multiclass)
+		{
+			classDiv.innerHTML += "===="+carClass+"====<br>";
+		}
 		classDiv.innerHTML += "{{TeamPrizePool |cutafter=3 |prizesummary=no<br>";
 				
 		for (const [key, value] of Object.entries(classArray[carClass])) {
@@ -105,21 +114,28 @@ try {
 	entryDiv = document.createElement("div");
 	entryDiv.innerHTML += "==Participants==<br>";
 	entryDiv.innerHTML += "{{TeamCardToggleButton|left}}<br>";
-	entryDiv.innerHTML += "{{Tabs dynamic<br>";
-	entryDiv.innerHTML += "|This=1<br>";
+
 	
-	//class names
-	i = 1
-	for (var carClass in classArray)
-	{	
-		entryDiv.innerHTML += "|name"+i+"="+carClass+"<br>";
-		i++;
+	if(multiclass)
+	{
+		entryDiv.innerHTML += "{{Tabs dynamic<br>";
+		entryDiv.innerHTML += "|This=1<br>";
+		//class names
+		i = 1
+		for (var carClass in classArray)
+		{	
+			entryDiv.innerHTML += "|name"+i+"="+carClass+"<br>";
+			i++;
+		}
 	}
 	
 	i = 1
 	for (var carClass in classArray) {
 		//content	
-		entryDiv.innerHTML += "|content"+i+"=<br>";
+		if(multiclass)
+		{
+			entryDiv.innerHTML += "|content"+i+"=<br>";
+		}
 		entryDiv.innerHTML += "{{box|start|padding=2em}}<br>";
 		for (const [key, value] of Object.entries(classArray[carClass])){		
 			entryDiv.innerHTML += "{{TeamCard<br>";
@@ -509,3 +525,4 @@ try {
 	<div id="ladder">
 	</div>
 </div>
+
