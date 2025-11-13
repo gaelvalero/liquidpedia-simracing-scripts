@@ -1,0 +1,88 @@
+<script>
+
+function getFile (elm) {
+try {
+	document.getElementById('results').innerHTML = "";
+	
+  new Response(elm.files[0]).json().then(json => {
+	results = {};
+	for (const [key, value] of Object.entries(json['data']['session_results'])) {	
+		if(value['simsession_type_name'] == "Race")
+		{
+			results = json['data']['session_results'][key]['results'];
+		}
+	}
+	
+	if(Object.keys(results).length == 0)
+	{
+		console.log('no race result');
+	}
+	
+	teams = [];
+	classRaceFastestLaps = {};
+	classRaceFastestLapsID = {};
+	
+	outputData = [];
+	results.forEach(function(team) {
+		console.log(team);
+		newTeam = [{'id':team['team_id'],'name':team['display_name'],'carclass':team['car_class_name'],'carNumber':team['livery']['car_number'],'finishPosition':team['finish_position']+1,'finishPositionClass':team['finish_position_in_class']+1,'startingPosition':team['starting_position']+1,'startingPositionClass':team['starting_position_in_class']+1}];
+		teams.push(newTeam);
+		
+		if(classRaceFastestLaps[team['car_class_name']])
+		{
+			if(team['best_lap_time'] != -1 && team['best_lap_time'] < classRaceFastestLaps[team['car_class_name']])
+			{
+				classRaceFastestLaps[team['car_class_name']] = team['best_lap_time'];
+				classRaceFastestLapsID['FL '+ team['car_class_name']] = team['team_id'];
+			}
+		}
+		else
+		{
+			classRaceFastestLaps[team['car_class_name']] = team['best_lap_time'];
+			classRaceFastestLapsID['FL '+ team['car_class_name']] = team['team_id'];
+		}
+	});
+	teams.push(classRaceFastestLapsID);
+	
+	resultDiv = document.getElementById("results");
+	resultDiv.innerHTML = JSON.stringify(teams);	
+	
+  });
+    
+	} catch (error) {
+	  console.error(error);
+	  // Expected output: ReferenceError: nonExistentFunction is not defined
+	  // (Note: the exact output may be browser-dependent)
+	}
+	
+}
+
+	function copyContent(id) {
+	  //content = document.getElementById('content');
+	  var r = document.createRange();
+		r.selectNode(document.getElementById(id));
+		window.getSelection().removeAllRanges();
+		window.getSelection().addRange(r);
+		try {
+			document.execCommand('copy');
+			window.getSelection().removeAllRanges();
+			alert('Successfully copied');
+		} catch (err) {
+			console.log('Unable to copy!');
+		}
+
+	}
+</script>
+
+<label for="resultFile">Choose a JSON result file:</label>
+
+<input type="file" id="resultFile" onchange="getFile(this)"/>
+
+<!-- The button used to copy the text -->
+<button onclick="copyContent('content')">Copy content</button>
+
+<div id="content">
+	<div id="results">
+	</div>
+</div>
+
