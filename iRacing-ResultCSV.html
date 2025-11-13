@@ -1,5 +1,4 @@
 <script>
-
 function getFile (elm) {
 try {
 	document.getElementById('results').innerHTML = "";
@@ -24,8 +23,7 @@ try {
 	
 	outputData = [];
 	results.forEach(function(team) {
-		console.log(team);
-		newTeam = [{'id':team['team_id'],'name':team['display_name'],'carclass':team['car_class_name'],'carNumber':team['livery']['car_number'],'finishPosition':team['finish_position']+1,'finishPositionClass':team['finish_position_in_class']+1,'startingPosition':team['starting_position']+1,'startingPositionClass':team['starting_position_in_class']+1}];
+		newTeam = [{'id':team['team_id'],'name':team['display_name'],'carclass':team['car_class_name'],'carNumber':team['livery']['car_number'],'finishPosition':team['finish_position']+1,'finishPositionClass':team['finish_position_in_class']+1,'startingPosition':team['starting_position']+1,'startingPositionClass':team['starting_position_in_class']+1,'carName':team['car_name']}];
 		teams.push(newTeam);
 		
 		if(classRaceFastestLaps[team['car_class_name']])
@@ -85,4 +83,3 @@ try {
 	<div id="results">
 	</div>
 </div>
-
