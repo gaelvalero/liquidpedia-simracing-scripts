@@ -1,0 +1,165 @@
+<script>
+    /**
+     * Entfernt Sonderzeichen aus dem Teamnamen, behält Punkte, Leerzeichen und Bindestriche.
+     * @param {string} displayName Der ursprüngliche Teamname.
+     * @returns {string} Der bereinigte Teamname.
+     */
+    function formatDisplayName(displayName) {
+        if (!displayName) {
+            return "";
+        }
+        // Erlaubt: Buchstabe, Zahl, Leerzeichen, Punkt, Bindestrich
+        return displayName.replace(/[^a-zA-Z0-9\s.-]/g, '').trim();
+    }
+
+    /**
+     * Generiert den Wiki-TeamCard-Block für ein Team.
+     * @param {object} teamData Die extrahierten Team-Daten.
+     * @returns {string} Der fertige Wiki-Code.
+     */
+    function generateTeamCard(teamData) {
+        let wikiText = '{{TeamCard\n';
+
+        // 1. Team-Feld
+        const teamName = teamData.displayNameFormatted || teamData.displayName;
+        wikiText += `|team=${teamName}\n`;
+
+        // 2. Qualifier-Feld
+        // Format: {{Manufacturer/carNameFormatted}} [[carName|shortCarNameVersion]]
+        const qualifier = `|qualifier={{Manufacturer/${teamData.carNameFormatted}}} [[${teamData.carName}|${teamData.shortCarNameVersion}]]`;
+        wikiText += `${qualifier}\n`;
+
+        // 3. Fahrer (p1, p2, ...)
+        teamData.drivers.forEach((driver, index) => {
+            const p = index + 1;
+            // Format: |p1=Sean D Campbell |p1flag=US
+            wikiText += `|p${p}=${driver.display_name} |p${p}flag=${driver.country_code}\n`;
+        });
+
+        // 4. Spieleranzahl
+        wikiText += `|players=${teamData.drivers.length}\n`;
+        wikiText += '}}';
+
+        return wikiText;
+    }
+
+
+    function getFile (elm) {
+        try {
+            document.getElementById('results').innerHTML = "";
+
+            new Response(elm.files[0]).json().then(json => {
+                results = {};
+
+                // 1. Filter für die "Race"-Session
+                for (const [key, value] of Object.entries(json['data']['session_results'])) {
+                    if(value['simsession_type_name'] == "Race")
+                    {
+                        results = json['data']['session_results'][key]['results'];
+                        break;
+                    }
+                }
+
+                if(Object.keys(results).length == 0)
+                {
+                    console.log('no race result');
+                    document.getElementById('results').innerHTML = "No Race session found in the file.";
+                    return;
+                }
+
+                outputData = [];
+
+                results.forEach(function(team) {
+
+                    // --- Teamnamen-Formatierung ---
+                    const originalDisplayName = team['display_name'];
+                    const formattedDisplayName = formatDisplayName(originalDisplayName);
+
+                    // --- Auto-Namen-Formatierung ---
+                    const fullCarName = team['car_name'];
+                    const firstSpaceIndex = fullCarName.indexOf(' ');
+
+                    // carNameFormatted: Hersteller in Kleinbuchstaben (z.B. "lamborghini")
+                    let manufacturer = fullCarName;
+                    if (firstSpaceIndex !== -1) {
+                        manufacturer = fullCarName.substring(0, firstSpaceIndex);
+                    }
+                    const carNameFormatted = manufacturer.toLowerCase();
+
+                    // shortCarNameVersion: Modell und Klasse (z.B. "Huracán GT3 EVO")
+                    let shortCarNameVersion = fullCarName;
+                    if (firstSpaceIndex !== -1) {
+                        shortCarNameVersion = fullCarName.substring(firstSpaceIndex + 1).trim();
+                    }
+
+                    // --- Datenerfassung ---
+                    const teamData = {
+                        'displayName': originalDisplayName,
+                        'displayNameFormatted': formattedDisplayName,
+                        'carName': fullCarName,
+                        'carNameFormatted': carNameFormatted,
+                        'shortCarNameVersion': shortCarNameVersion,
+                        'finishPosition': team['finish_position'] + 1, // Für die Sortierung
+                        // driver_results ist bereits ein Array, das die benötigten driver_results enthält
+                        'drivers': team['driver_results']
+                    };
+
+                    outputData.push(teamData);
+                });
+
+                // Numerische Sortierung der Liste nach 'finishPosition'
+                outputData.sort((a, b) => a.finishPosition - b.finishPosition);
+
+                // Generiere den finalen Wiki-Output
+                let wikiOutput = "";
+                // Definiere den Separator
+                const separator = '\n\n{{box|break|padding=2em}}\n\n';
+
+                outputData.forEach((team, index) => {
+                    wikiOutput += generateTeamCard(team);
+
+                    // Füge den Separator nur zwischen den Karten ein, nicht nach der letzten Karte
+                    if (index < outputData.length - 1) {
+                        wikiOutput += separator;
+                    }
+                });
+
+                resultDiv = document.getElementById("results");
+                // Zeige den Wiki-Text an
+                resultDiv.innerHTML = wikiOutput;
+
+            });
+
+        } catch (error) {
+            console.error("An error occurred during file processing:", error);
+            document.getElementById('results').innerHTML = "Error processing file. Check console for details.";
+        }
+
+    }
+
+    function copyContent(id) {
+        //content = document.getElementById('content');
+        var r = document.createRange();
+        r.selectNode(document.getElementById(id));
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(r);
+        try {
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            alert('Successfully copied');
+        } catch (err) {
+            console.log('Unable to copy!');
+        }
+
+    }
+</script>
+
+<label for="resultFile">Choose a JSON result file (iRacing):</label>
+
+<input type="file" id="resultFile" onchange="getFile(this)"/>
+
+<button onclick="copyContent('content')">Copy content</button>
+
+<div id="content">
+    <pre id="results"></pre>
+</div>

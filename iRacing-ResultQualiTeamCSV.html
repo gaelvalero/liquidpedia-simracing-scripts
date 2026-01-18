@@ -1,0 +1,132 @@
+<script>
+	/**
+	 * Konvertiert iRacing-Zeit von Zehntel-Millisekunden (z.B. 1162470) in mm:ss.000.
+	 * (1162470 / 10000 = 116.247 Sekunden)
+	 * @param {number} rawTimeInput Die Zeit in Zehntel-Millisekunden.
+	 * @returns {string} Die formatierte Zeit.
+	 */
+	function formatLapTime(rawTimeInput) {
+		if (rawTimeInput <= 0 || rawTimeInput === null) {
+			return "";
+		}
+
+		// Die Division durch 10000 konvertiert Zehntel-Millisekunden direkt in Sekunden.
+		const totalSeconds = rawTimeInput / 10000;
+
+		// 1. Minuten
+		const minutes = Math.floor(totalSeconds / 60);
+
+		// 2. Sekunden (Rest nach Minuten, abgerundet)
+		const seconds = Math.floor(totalSeconds % 60);
+
+		// 3. Millisekunden 
+		// Berechnet den verbleibenden Dezimalanteil der Sekunden und multipliziert ihn mit 1000.
+		const milliseconds = Math.round((totalSeconds - (minutes * 60) - seconds) * 1000);
+
+		// 4. Formatierung
+		const minutesString = minutes.toString();
+		const secondsString = seconds.toString().padStart(2, '0');
+		const millisecondsString = milliseconds.toString().padStart(3, '0');
+
+		// Erwartetes Ergebnis für 1162470: "1:56.247"
+		return `${minutesString}:${secondsString}.${millisecondsString}`;
+	}
+
+
+	function getFile (elm) {
+		try {
+			document.getElementById('results').innerHTML = "";
+
+			new Response(elm.files[0]).json().then(json => {
+				results = {};
+
+				// 1. Find the "Lone Qualifying" session results
+				for (const [key, value] of Object.entries(json['data']['session_results'])) {
+					if(value['simsession_type_name'] == "Lone Qualifying")
+					{
+						results = json['data']['session_results'][key]['results'];
+						break; // Exit loop once found
+					}
+				}
+
+				if(Object.keys(results).length == 0)
+				{
+					console.log('no qualifying result');
+					document.getElementById('results').innerHTML = "No Lone Qualifying session found in the file.";
+					return;
+				}
+
+				outputData = [];
+
+				results.forEach(function(team) {
+					// Extract driver info from the first element of driver_results array
+					const driverInfo = team['driver_results'][0];
+
+					// --- NEUE LOGIK FÜR CAR NAME FORMATIERUNG ---
+					const fullCarName = team['car_name'];
+					let manufacturer = fullCarName;
+					const firstSpaceIndex = fullCarName.indexOf(' ');
+
+					if (firstSpaceIndex !== -1) {
+						// Schneidet den String vor dem ersten Leerzeichen ab
+						manufacturer = fullCarName.substring(0, firstSpaceIndex);
+					}
+					const carNameFormatted = manufacturer.toLowerCase();
+					// ------------------------------------------
+
+					newTeam = {
+						// Position fields start at 0, add 1
+						'finishPosition': team['finish_position'] + 1,
+						'finishPositionClass': team['finish_position_in_class'] + 1,
+						'displayName': team['display_name'], // Team Name
+						'driverName': driverInfo ? driverInfo['display_name'] : 'N/A', // Driver Name
+						'countryCode': driverInfo ? driverInfo['country_code'] : 'N/A', // Driver Country
+						'carName': fullCarName,
+						'carNumber': team['livery']['car_number'],
+						'carNameFormatted': carNameFormatted, // <--- NEU HINZUGEFÜGT
+						// Use the corrected function to format the raw time
+						'bestQualLapTime': formatLapTime(team['best_qual_lap_time'])
+					};
+
+					outputData.push(newTeam);
+				});
+
+				resultDiv = document.getElementById("results");
+				// Display the results as a formatted JSON string
+				resultDiv.innerHTML = JSON.stringify(outputData, null, 2);
+
+			});
+
+		} catch (error) {
+			console.error("An error occurred during file processing:", error);
+			document.getElementById('results').innerHTML = "Error processing file. Check console for details.";
+		}
+
+	}
+
+	function copyContent(id) {
+		//content = document.getElementById('content');
+		var r = document.createRange();
+		r.selectNode(document.getElementById(id));
+		window.getSelection().removeAllRanges();
+		window.getSelection().addRange(r);
+		try {
+			document.execCommand('copy');
+			window.getSelection().removeAllRanges();
+			alert('Successfully copied');
+		} catch (err) {
+			console.log('Unable to copy!');
+		}
+
+	}
+</script>
+
+<label for="resultFile">Choose a JSON result file:</label>
+
+<input type="file" id="resultFile" onchange="getFile(this)"/>
+
+<button onclick="copyContent('content')">Copy content</button>
+
+<div id="content">
+	<pre id="results"></pre>
+</div>

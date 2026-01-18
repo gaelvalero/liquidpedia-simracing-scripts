@@ -1,0 +1,156 @@
+<script>
+    /**
+     * Konvertiert iRacing-Zeit von Zehntel-Millisekunden (z.B. 1162470) in mm:ss.000.
+     * Die Division durch 10000 konvertiert den Wert in Sekunden.
+     * @param {number} rawTimeInput Die Zeit in Zehntel-Millisekunden.
+     * @returns {string} Die formatierte Zeit, oder "" bei ungültigem Wert.
+     */
+    function formatTimeFromTenthMs(rawTimeInput) {
+        if (rawTimeInput <= 0 || rawTimeInput === null) {
+            return "";
+        }
+
+        // Die Division durch 10000 konvertiert Zehntel-Millisekunden direkt in Sekunden.
+        const totalSeconds = rawTimeInput / 10000;
+
+        // 1. Minuten
+        const minutes = Math.floor(totalSeconds / 60);
+
+        // 2. Sekunden (Rest nach Minuten, abgerundet)
+        const seconds = Math.floor(totalSeconds % 60);
+
+        // 3. Millisekunden 
+        // Berechnet den verbleibenden Dezimalanteil der Sekunden und multipliziert ihn mit 1000.
+        const milliseconds = Math.round((totalSeconds - (minutes * 60) - seconds) * 1000);
+
+        // 4. Formatierung
+        const minutesString = minutes.toString();
+        const secondsString = seconds.toString().padStart(2, '0');
+        const millisecondsString = milliseconds.toString().padStart(3, '0');
+
+        // Ausgabe: "1:56.247"
+        return `${minutesString}:${secondsString}.${millisecondsString}`;
+    }
+
+    /**
+     * Entfernt Sonderzeichen aus dem Teamnamen, behält aber Punkte, Leerzeichen und Bindestriche.
+     * @param {string} displayName Der ursprüngliche Teamname.
+     * @returns {string} Der bereinigte Teamname.
+     */
+    function formatDisplayName(displayName) {
+        if (!displayName) {
+            return "";
+        }
+        // KORRIGIERT: Ersetzt alle Zeichen, die NICHT Buchstabe (a-z, A-Z), Zahl (0-9), Leerzeichen (\s), Bindestrich (-) ODER PUNKT (.) sind, durch einen leeren String.
+        return displayName.replace(/[^a-zA-Z0-9\s.-]/g, '').trim();
+    }
+
+
+    function getFile (elm) {
+        try {
+            document.getElementById('results').innerHTML = "";
+
+            new Response(elm.files[0]).json().then(json => {
+                results = {};
+
+                // 1. Filter für die "Race"-Session
+                for (const [key, value] of Object.entries(json['data']['session_results'])) {
+                    if(value['simsession_type_name'] == "Race")
+                    {
+                        results = json['data']['session_results'][key]['results'];
+                        break; // Beendet die Suche, sobald das Rennen gefunden wurde
+                    }
+                }
+
+                if(Object.keys(results).length == 0)
+                {
+                    console.log('no race result');
+                    document.getElementById('results').innerHTML = "No Race session found in the file.";
+                    return;
+                }
+
+                outputData = [];
+
+                results.forEach(function(team) {
+                    // --- LOGIK FÜR DISPLAY NAME FORMATIERUNG ---
+                    const originalDisplayName = team['display_name'];
+                    const formattedDisplayName = formatDisplayName(originalDisplayName);
+
+                    // Logik für Car Name Formatierung (Hersteller)
+                    const fullCarName = team['car_name'];
+                    let manufacturer = fullCarName;
+                    const firstSpaceIndex = fullCarName.indexOf(' ');
+
+                    if (firstSpaceIndex !== -1) {
+                        manufacturer = fullCarName.substring(0, firstSpaceIndex);
+                    }
+                    const carNameFormatted = manufacturer.toLowerCase();
+
+                    newTeam = {
+                        // Endpositionen (+1, da Zählung bei 0 beginnt)
+                        'finishPosition': team['finish_position'] + 1,
+                        'finishPositionClass': team['finish_position_in_class'] + 1,
+                        // Startpositionen (+1, da Zählung bei 0 beginnt)
+                        'startingPosition': team['starting_position'] + 1,
+                        'startingPositionClass': team['starting_position_in_class'] + 1,
+
+                        // Auto-Informationen
+                        'displayName': originalDisplayName, // Originaler Teamname
+                        'displayNameFormatted': formattedDisplayName, // Bereinigter Teamname (erlaubt .)
+                        'carName': fullCarName,
+                        'carNumber': team['livery']['car_number'],
+                        'carNameFormatted': carNameFormatted,
+
+                        // Runden und Zeiten
+                        'lapsComplete': team['laps_complete'],
+                        // Bestzeit, formatiert von Zehntel-Millisekunden
+                        'bestLapTime': formatTimeFromTenthMs(team['best_lap_time']),
+                        // Abstand zum Vordermann/Leader, formatiert von Zehntel-Millisekunden
+                        'interval': formatTimeFromTenthMs(team['interval'])
+                    };
+
+                    outputData.push(newTeam);
+                });
+
+                // Numerische Sortierung der outputData-Liste nach 'finishPosition'
+                outputData.sort((a, b) => a.finishPosition - b.finishPosition);
+
+                resultDiv = document.getElementById("results");
+                // Display the results as a formatted JSON string
+                resultDiv.innerHTML = JSON.stringify(outputData, null, 2);
+
+            });
+
+        } catch (error) {
+            console.error("An error occurred during file processing:", error);
+            document.getElementById('results').innerHTML = "Error processing file. Check console for details.";
+        }
+
+    }
+
+    function copyContent(id) {
+        //content = document.getElementById('content');
+        var r = document.createRange();
+        r.selectNode(document.getElementById(id));
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(r);
+        try {
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            alert('Successfully copied');
+        } catch (err) {
+            console.log('Unable to copy!');
+        }
+
+    }
+</script>
+
+<label for="resultFile">Choose a JSON result file (iRacing):</label>
+
+<input type="file" id="resultFile" onchange="getFile(this)"/>
+
+<button onclick="copyContent('content')">Copy content</button>
+
+<div id="content">
+    <pre id="results"></pre>
+</div>
