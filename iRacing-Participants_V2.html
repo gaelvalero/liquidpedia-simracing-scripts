@@ -1,0 +1,147 @@
+﻿<script>
+    // Toggle will be read from checkbox instead of constant
+
+    function formatDisplayName(displayName) {
+        if (!displayName) return "";
+        return displayName.replace(/[^a-zA-Z0-9\s.-]/g, '').trim();
+    }
+
+    function generateTeamCard(teamData, useManufacturer) {
+        let wikiText = `|{{Opponent|${teamData.displayNameFormatted || teamData.displayName}\n`;
+
+        // --- Players ---
+        wikiText += `|players={{Persons\n`;
+
+        teamData.drivers.forEach((driver) => {
+            wikiText += `|{{Person|${driver.display_name}|flag=${driver.country_code}}}\n`;
+        });
+
+        wikiText += `}}\n`;
+
+        // --- Notes ---
+        wikiText += `|notes={{Notes\n`;
+
+        let carLine = '';
+
+        if (useManufacturer) {
+            carLine = `{{Manufacturer/${teamData.carNameFormatted}}} [[${teamData.carName}|${teamData.shortCarNameVersion}]]`;
+        } else {
+            carLine = `[[${teamData.carName}|${teamData.shortCarNameVersion}]]`;
+        }
+
+        wikiText += `|{{Notes|${carLine}}}\n`;
+        wikiText += `}}\n`;
+
+        wikiText += `}}`;
+
+        return wikiText;
+    }
+
+    function getFile(elm) {
+        try {
+            document.getElementById('results').innerHTML = "";
+
+            const useManufacturer = document.getElementById('useManufacturer').checked;
+
+            new Response(elm.files[0]).json().then(json => {
+                let results = {};
+
+                // Find Race session
+                for (const [key, value] of Object.entries(json['data']['session_results'])) {
+                    if (value['simsession_type_name'] == "Race") {
+                        results = json['data']['session_results'][key]['results'];
+                        break;
+                    }
+                }
+
+                if (Object.keys(results).length === 0) {
+                    document.getElementById('results').innerHTML = "No Race session found in the file.";
+                    return;
+                }
+
+                let outputData = [];
+
+                results.forEach(function(team) {
+
+                    const originalDisplayName = team['display_name'];
+                    const formattedDisplayName = formatDisplayName(originalDisplayName);
+
+                    const fullCarName = team['car_name'];
+                    const firstSpaceIndex = fullCarName.indexOf(' ');
+
+                    let manufacturer = fullCarName;
+                    if (firstSpaceIndex !== -1) {
+                        manufacturer = fullCarName.substring(0, firstSpaceIndex);
+                    }
+
+                    const carNameFormatted = manufacturer.toLowerCase();
+
+                    let shortCarNameVersion = fullCarName;
+                    if (firstSpaceIndex !== -1) {
+                        shortCarNameVersion = fullCarName.substring(firstSpaceIndex + 1).trim();
+                    }
+
+                    const teamData = {
+                        displayName: originalDisplayName,
+                        displayNameFormatted: formattedDisplayName,
+                        carName: fullCarName,
+                        carNameFormatted: carNameFormatted,
+                        shortCarNameVersion: shortCarNameVersion,
+                        finishPosition: team['finish_position'] + 1,
+                        drivers: team['driver_results']
+                    };
+
+                    outputData.push(teamData);
+                });
+
+                // Sort by finish position
+                outputData.sort((a, b) => a.finishPosition - b.finishPosition);
+
+                // Build output
+                let wikiOutput = "";
+                const separator = '\n\n';
+                outputData.forEach((team, index) => {
+                    wikiOutput += generateTeamCard(team, useManufacturer);
+
+                    if (index < outputData.length - 1) {
+                        wikiOutput += separator;
+                    }
+                });
+
+                document.getElementById("results").textContent = wikiOutput;
+            });
+
+        } catch (error) {
+            console.error(error);
+            document.getElementById('results').innerHTML = "Error processing file.";
+        }
+    }
+
+    function copyContent(id) {
+        const content = document.getElementById(id).innerText;
+
+        navigator.clipboard.writeText(content).then(() => {
+            alert('Successfully copied');
+        }).catch(() => {
+            alert('Copy failed');
+        });
+    }
+</script>
+
+<label for="resultFile">Choose a JSON result file (iRacing):</label>
+<input type="file" id="resultFile" onchange="getFile(this)" />
+
+<br><br>
+
+<label>
+    <input type="checkbox" id="useManufacturer" checked>
+    Include Manufacturer
+</label>
+
+<br><br>
+
+<button onclick="copyContent('results')">Copy content</button>
+
+<div id="content">
+    <pre id="results"></pre>
+</div>
