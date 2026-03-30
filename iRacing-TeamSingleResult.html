@@ -2,6 +2,7 @@
 //ver1 - Results & Participants
 //ver2 - Detailed Results
 //ver3 - Qualifier driver added
+//ver4 - Bold leaders in Race results + class interval
 function str_pad_left(string, pad, length) {
   return (new Array(length + 1).join(pad) + string).slice(-length);
 }
@@ -339,6 +340,7 @@ try {
 	ladderEntryDiv.innerHTML += "!Team<br>";
 	ladderEntryDiv.innerHTML += "!Car<br>";
 	ladderEntryDiv.innerHTML += "!style=\"padding-left: 15px;\"|Gap<br>";
+	ladderEntryDiv.innerHTML += "!style=\"padding-left: 15px;\"|Gap Class<br>";
 	ladderEntryDiv.innerHTML += "!Grid<br>";
 	ladderEntryDiv.innerHTML += "!style=\"padding-left: 15px;\"|FL<br>";
 	ladderEntryDiv.innerHTML += "|-<br>";
@@ -346,6 +348,7 @@ try {
 	i = 1
 	lapTime=9999999;
 	teamIdFastestLap = 0;
+	teamsClassLeader = {};
 	results.forEach(function(team) {
 		if(team['best_lap_time'] < lapTime && team['best_lap_time'] != -1)
 		{
@@ -353,7 +356,18 @@ try {
 			teamKeyFastestLap = i;
 		}
 		i++;
+		
+		if(team['interval'] == 0 && team['class_interval'] == 0)
+		{
+			teamsClassLeader[team['car_class_name']] = team;
+		}
+		else if(team['interval'] == -1 && team['class_interval'] == 0)
+		{
+			teamsClassLeader[team['car_class_name']] = team;
+		}
 	});
+	
+	console.log(teamsClassLeader);
 	
 	i = 1
 	//overall results
@@ -369,6 +383,8 @@ try {
 		}
 		
 		teamInterval = ""
+		teamClassInterval = ""
+		
 		if(team['interval'] == -1)
 		{
 			teamInterval = "-" + (results[0]['laps_complete'] - team['laps_complete']) + " Laps";
@@ -376,6 +392,32 @@ try {
 		else
 		{
 			teamInterval = "+" + iRacingTimeToString(team['interval']);
+		}
+		
+		//if class interval = 0 and interval = 0 / overall leader
+		//if class interval = 0 and interval = -1 / class leader
+		
+		if(team['class_interval'] == -1)
+		{
+			textLap = "";
+			// get class leader number of laps
+			if((teamsClassLeader[team['car_class_name']]['laps_complete'] - team['laps_complete']) > 1)
+			{
+				textLap = " Laps";
+			}
+			else
+			{
+				textLap = " Lap";
+			}
+			teamClassInterval = "-" + (teamsClassLeader[team['car_class_name']]['laps_complete'] - team['laps_complete']) + textLap;
+		}
+		else if(team['class_interval'] == 0 && team['interval'] == -1)
+		{
+			teamClassInterval = team['laps_complete'] + " Laps";
+		}
+		else
+		{
+			teamClassInterval = "+" + iRacingTimeToString(team['class_interval']);
 		}
 		
 		//multiclass
@@ -399,31 +441,36 @@ try {
 				ladderEntryDiv.innerHTML += "|'''"+i+"'''|";
 			}
 			
-			
 			if(team["finish_position_in_class"]+1 == 1 && i == 1)
 			{
-				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1'''||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
-				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+team['laps_complete']+" Laps||"+ (team['starting_position']+1)
+				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1'''||"+"'''"+team["car_class_name"]+"'''"+"||"+"'''"+team["livery"]["car_number"]+"'''"+"||style=\"text-align: left;\"|'''{{team|"+team["display_name"].replace('#','').replace('$','')+"}}''' ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|'''"+team['laps_complete']+ " Laps'''<br>";
+				ladderEntryDiv.innerHTML += "|<br>"
+				ladderEntryDiv.innerHTML += "|"+ (team['starting_position']+1)
 			}
 			else if(team["finish_position_in_class"]+1 == 1 && i != 1)
 			{
-				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1''' ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
-				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1)
+				ladderEntryDiv.innerHTML += "|class=\"bg-first|'''1''' ||"+"'''"+team["car_class_name"]+"'''"+"||"+"'''"+team["livery"]["car_number"]+"'''"+"||style=\"text-align: left;\"|'''{{team|"+team["display_name"].replace('#','').replace('$','')+"}}''' ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|'''"+teamInterval+"'''<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|'''"+teamClassInterval+"'''||" +"'''"+(team['starting_position']+1+"'''");
 			}
 			else if(team["finish_position_in_class"]+1 == 2)
 			{
-				ladderEntryDiv.innerHTML += "|class=\"bg-second|'''2''' ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
-				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1);
+				ladderEntryDiv.innerHTML += "|class=\"bg-second|2 ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamClassInterval+"||" +(team['starting_position']+1);
 			}
 			else if(team["finish_position_in_class"]+1 == 3)
 			{
-				ladderEntryDiv.innerHTML += "|class=\"bg-third|'''3''' ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
-				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1);
+				ladderEntryDiv.innerHTML += "|class=\"bg-third|3 ||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+"||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamClassInterval+"||" +(team['starting_position']+1);
 			}
 			else
 			{
 				ladderEntryDiv.innerHTML += "|"+ (team["finish_position_in_class"]+1) +"||"+team["car_class_name"]+"||"+team["livery"]["car_number"]+" ||style=\"text-align: left;\"|{{team|"+team["display_name"].replace('#','').replace('$','')+"}} ||"+ carBrand +"<br>";
-				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"||"+ (team['starting_position']+1);
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamInterval+"<br>";
+				ladderEntryDiv.innerHTML += "|style=\"text-align: right; padding-left: 15px;\"|"+teamClassInterval+"||" +(team['starting_position']+1);
 			}
 			
 			if(team['best_lap_time'] === classRaceFastestLaps[team['car_class_name']])
